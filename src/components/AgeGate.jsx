@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'age_verified_21'
+const API_BASE = import.meta.env.VITE_BACKEND_URL || ''
 
 export default function AgeGate({ minimumAge = 21, onVerified }) {
   const [open, setOpen] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const v = localStorage.getItem(STORAGE_KEY)
@@ -13,14 +15,26 @@ export default function AgeGate({ minimumAge = 21, onVerified }) {
     }
   }, [onVerified])
 
-  const handleVerify = (is21) => {
-    if (is21) {
+  const handleVerify = async (is21) => {
+    if (!is21) {
+      alert(`You must be ${minimumAge}+ to enter.`)
+      return
+    }
+    try {
+      setSubmitting(true)
+      await fetch(`${API_BASE}/verify-age`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
       localStorage.setItem(STORAGE_KEY, 'true')
       setOpen(false)
       onVerified?.()
-    } else {
-      alert(`You must be ${minimumAge}+ to enter.`)
-      // Keep modal open
+    } catch (e) {
+      // even if API fails, don't allow entry
+      alert('Unable to verify age at this time. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -34,15 +48,17 @@ export default function AgeGate({ minimumAge = 21, onVerified }) {
         <div className="flex gap-3">
           <button
             className="flex-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 transition"
-            onClick={() => handleVerify(false)}
+            onClick={() => alert(`You must be ${minimumAge}+ to enter.`)}
+            disabled={submitting}
           >
             I'm under {minimumAge}
           </button>
           <button
-            className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 transition"
+            className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 transition disabled:opacity-60"
             onClick={() => handleVerify(true)}
+            disabled={submitting}
           >
-            I'm {minimumAge}+
+            {submitting ? 'Verifying…' : `I'm ${minimumAge}+`}
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-4">By entering, you confirm that you are of legal age in your jurisdiction.</p>

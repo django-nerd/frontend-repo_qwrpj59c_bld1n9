@@ -28,7 +28,7 @@ function CategoryTabs({ value, onChange }) {
   )
 }
 
-function ProductCard({ p }) {
+function ProductCard({ p, onAdd }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col">
       <div className="aspect-video w-full rounded-lg bg-gradient-to-br from-emerald-50 to-green-100 mb-3" />
@@ -45,7 +45,7 @@ function ProductCard({ p }) {
           {p.cbd_mg ? `CBD ${p.cbd_mg}mg` : ''}
         </div>
       )}
-      <button className="mt-auto rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 transition">Add to cart</button>
+      <button onClick={() => onAdd(p)} className="mt-auto rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 transition">Add to cart</button>
     </div>
   )
 }
@@ -56,6 +56,18 @@ export default function Storefront() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cart, setCart] = useState({ items: [], subtotal: 0 })
+
+  const fetchCart = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/cart`, { credentials: 'include' })
+      if (!r.ok) throw new Error(await r.text())
+      const data = await r.json()
+      setCart(data)
+    } catch (e) {
+      // ignore cart errors for now
+    }
+  }
 
   useEffect(() => {
     // fetch policy once
@@ -63,12 +75,14 @@ export default function Storefront() {
       .then((r) => r.json())
       .then(setPolicy)
       .catch(() => {})
+
+    fetchCart()
   }, [])
 
   useEffect(() => {
     setLoading(true)
     setError('')
-    fetch(`${API_BASE}/products?category=${category}`)
+    fetch(`${API_BASE}/products?category=${category}`, { credentials: 'include' })
       .then(async (r) => {
         if (!r.ok) throw new Error(await r.text())
         return r.json()
@@ -83,11 +97,31 @@ export default function Storefront() {
     return `For adults ${min}+ only. Keep out of reach of children. Use responsibly.`
   }, [policy])
 
+  const addToCart = async (p) => {
+    try {
+      const r = await fetch(`${API_BASE}/cart/items`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: p.id, qty: 1 })
+      })
+      if (!r.ok) throw new Error(await r.text())
+      await fetchCart()
+    } catch (e) {
+      alert('Unable to add to cart. Please try again.')
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Cannabis Shop</h1>
-        <p className="text-gray-600">{disclaimer}</p>
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Cannabis Shop</h1>
+          <p className="text-gray-600">{disclaimer}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-800">
+          <span className="font-semibold">Cart:</span> {cart.items?.length || 0} items · ${cart.subtotal?.toFixed?.(2) ?? cart.subtotal}
+        </div>
       </div>
 
       <CategoryTabs value={category} onChange={setCategory} />
@@ -97,7 +131,7 @@ export default function Storefront() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map((p) => (
-          <ProductCard key={p.id} p={p} />)
+          <ProductCard key={p.id} p={p} onAdd={addToCart} />)
         )}
       </div>
     </div>
